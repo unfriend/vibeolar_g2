@@ -30,6 +30,7 @@
 <script type="module">
   const template = document.createElement('template');
   template.innerHTML = globalThis.__g2CurrentTemplate;
+  const DEFAULT_FREQUENCY = 220;
 
   class G2OscDual extends HTMLElement {
     constructor() {
@@ -57,8 +58,8 @@
       if (this.oscA) return;
       this.oscA = context.createOscillator();
       this.oscB = context.createOscillator();
-      this.oscA.frequency.value = 220;
-      this.oscB.frequency.value = 220;
+      this.oscA.frequency.value = DEFAULT_FREQUENCY;
+      this.oscB.frequency.value = DEFAULT_FREQUENCY;
       this.oscA.detune.value = -6;
       this.oscB.detune.value = 6;
       this.oscA.type = this.shadowRoot.getElementById('waveform').value;

@@ -7,6 +7,7 @@ const SIGNAL_COLORS = {
 const KNOB_SENSITIVITY = 220;
 const MIN_CURVE_DISTANCE = 40;
 const CURVE_FACTOR = 0.45;
+const SIGNAL_LEVEL_MULTIPLIER = 3.3;
 
 class G2Knob extends HTMLElement {
   static observedAttributes = ['value', 'min', 'max'];
@@ -152,6 +153,7 @@ class SynthHost {
       };
       const onUp = () => {
         window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
       };
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp, { once: true });
@@ -263,7 +265,8 @@ class SynthHost {
         sourceNode.connect(targetNode);
         connection.disconnect = () => sourceNode.disconnect(targetNode);
       }
-    } catch {
+    } catch (error) {
+      console.warn('Audio connection fallback:', error);
       const fallback = context.createGain();
       fallback.gain.value = 1;
       const targetNode = targetModule.getInputNode?.(toPort);
@@ -321,7 +324,7 @@ class SynthHost {
       analyser.getByteTimeDomainData(data);
       let sum = 0;
       for (let i = 0; i < data.length; i += 1) sum += Math.abs((data[i] - 128) / 128);
-      const level = Math.min(1, (sum / data.length) * 3.3);
+      const level = Math.min(1, (sum / data.length) * SIGNAL_LEVEL_MULTIPLIER);
       connection.path.style.setProperty('--flow', String(level));
       if ((connection.output.getAttribute('color') || '') === 'yellow') {
         connection.path.style.opacity = level > 0.1 ? '1' : '0.45';
