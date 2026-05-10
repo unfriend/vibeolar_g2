@@ -4,6 +4,9 @@ const SIGNAL_COLORS = {
   yellow: '#e5a92a',
   orange: '#dc7f22'
 };
+const KNOB_SENSITIVITY = 220;
+const MIN_CURVE_DISTANCE = 40;
+const CURVE_FACTOR = 0.45;
 
 class G2Knob extends HTMLElement {
   static observedAttributes = ['value', 'min', 'max'];
@@ -35,7 +38,7 @@ class G2Knob extends HTMLElement {
     this.addEventListener('pointermove', (event) => {
       if (!this._pointerDown) return;
       const delta = (this._pointerDown.y - event.clientY) + (event.clientX - this._pointerDown.x);
-      this.value = Math.min(1, Math.max(0, this._pointerDown.value + (delta / 220)));
+      this.value = Math.min(1, Math.max(0, this._pointerDown.value + (delta / KNOB_SENSITIVITY)));
       this.dispatch();
     });
 
@@ -288,7 +291,7 @@ class SynthHost {
   }
 
   makeCurve(x1, y1, x2, y2) {
-    const dx = Math.max(40, Math.abs(x2 - x1) * 0.45);
+    const dx = Math.max(MIN_CURVE_DISTANCE, Math.abs(x2 - x1) * CURVE_FACTOR);
     return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
   }
 

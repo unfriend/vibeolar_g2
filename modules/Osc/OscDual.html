@@ -36,7 +36,8 @@
       super();
       this.attachShadow({ mode: 'open' });
       this.shadowRoot.appendChild(template.content.cloneNode(true));
-      this.osc = null;
+      this.oscA = null;
+      this.oscB = null;
       this.gain = null;
       this.pitchIn = null;
       this.pitchToDetune = null;
@@ -46,28 +47,38 @@
 
     connectedCallback() {
       this.shadowRoot.getElementById('waveform').addEventListener('change', (event) => {
-        if (this.osc) this.osc.type = event.target.value;
+        if (this.oscA) this.oscA.type = event.target.value;
+        if (this.oscB) this.oscB.type = event.target.value;
       });
       requestAnimationFrame(() => this.drawScope());
     }
 
     bindAudioContext(context) {
-      if (this.osc) return;
-      this.osc = context.createOscillator();
-      this.osc.frequency.value = 220;
-      this.osc.type = this.shadowRoot.getElementById('waveform').value;
+      if (this.oscA) return;
+      this.oscA = context.createOscillator();
+      this.oscB = context.createOscillator();
+      this.oscA.frequency.value = 220;
+      this.oscB.frequency.value = 220;
+      this.oscA.detune.value = -6;
+      this.oscB.detune.value = 6;
+      this.oscA.type = this.shadowRoot.getElementById('waveform').value;
+      this.oscB.type = this.shadowRoot.getElementById('waveform').value;
       this.gain = context.createGain();
       this.gain.gain.value = 0.22;
       this.pitchIn = context.createGain();
       this.pitchToDetune = context.createGain();
       this.pitchToDetune.gain.value = 100;
-      this.pitchIn.connect(this.pitchToDetune).connect(this.osc.detune);
-      this.osc.connect(this.gain);
+      this.pitchIn.connect(this.pitchToDetune);
+      this.pitchToDetune.connect(this.oscA.detune);
+      this.pitchToDetune.connect(this.oscB.detune);
+      this.oscA.connect(this.gain);
+      this.oscB.connect(this.gain);
       this.analyser = context.createAnalyser();
       this.analyser.fftSize = 256;
       this.scopeData = new Uint8Array(this.analyser.fftSize);
       this.gain.connect(this.analyser);
-      this.osc.start();
+      this.oscA.start();
+      this.oscB.start();
     }
 
     getOutputNode(port) {

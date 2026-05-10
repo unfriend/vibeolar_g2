@@ -32,6 +32,7 @@
 <script type="module">
   const template = document.createElement('template');
   template.innerHTML = globalThis.__g2CurrentTemplate;
+  const RELEASE_PLAYHEAD_MS = 500;
 
   class G2EnvADSR extends HTMLElement {
     constructor() {
@@ -134,7 +135,7 @@
       ctx.lineTo(canvas.width - 4, canvas.height - 4);
       ctx.stroke();
       if (this.lastGate) this.playhead = (this.playhead + 1.7) % canvas.width;
-      else if (this.releaseStart > 0 && performance.now() - this.releaseStart < 500) this.playhead = (this.playhead + 0.8) % canvas.width;
+      else if (this.releaseStart > 0 && performance.now() - this.releaseStart < RELEASE_PLAYHEAD_MS) this.playhead = (this.playhead + 0.8) % canvas.width;
       ctx.strokeStyle = 'rgba(229,169,42,0.85)';
       ctx.beginPath();
       ctx.moveTo(this.playhead, 2);
