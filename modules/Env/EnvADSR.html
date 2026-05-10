@@ -1,0 +1,149 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      width: 220px;
+      padding: 10px;
+      border: 1px solid #151515;
+      background: linear-gradient(#676767, #4f4f4f);
+      border-radius: 6px;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.35);
+    }
+    .head { font-size: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .knobs { display: flex; gap: 8px; justify-content: center; margin-bottom: 8px; }
+    .led { width: 10px; height: 10px; border-radius: 50%; background: rgba(229,169,42,.25); border:1px solid #111; }
+    canvas { width: 100%; height: 62px; background: #272727; border: 1px solid #131313; border-radius: 4px; }
+  </style>
+  <div class="head"><strong>EnvADSR</strong><span>Env</span></div>
+  <div class="row">
+    <g2-input color="yellow" port="gate" title="Gate in"></g2-input>
+    <div id="gate-led" class="led"></div>
+    <g2-output color="blue" port="env" title="Envelope out"></g2-output>
+  </div>
+  <div class="knobs">
+    <g2-knob id="a" value="0.15" min="0.001" max="3">A</g2-knob>
+    <g2-knob id="d" value="0.2" min="0.001" max="3">D</g2-knob>
+    <g2-knob id="s" value="0.6" min="0" max="1">S</g2-knob>
+    <g2-knob id="r" value="0.25" min="0.001" max="4">R</g2-knob>
+  </div>
+  <canvas id="adsr" width="200" height="62"></canvas>
+</template>
+<script type="module">
+  const template = document.createElement('template');
+  template.innerHTML = globalThis.__g2CurrentTemplate;
+  const RELEASE_PLAYHEAD_DURATION_MS = 500;
+
+  class G2EnvADSR extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this.shadowRoot.appendChild(template.content.cloneNode(true));
+      this.gateIn = null;
+      this.gateProbe = null;
+      this.envSource = null;
+      this.envGain = null;
+      this.lastGate = false;
+      this.playhead = 0;
+      this.releaseStart = 0;
+    }
+
+    connectedCallback() {
+      requestAnimationFrame(() => this.monitorGate());
+      requestAnimationFrame(() => this.drawCurve());
+    }
+
+    bindAudioContext(context) {
+      if (this.envSource) return;
+      this.gateIn = context.createGain();
+      this.gateProbe = context.createAnalyser();
+      this.gateProbe.fftSize = 32;
+      this.gateIn.connect(this.gateProbe);
+      this.envSource = context.createConstantSource();
+      this.envSource.offset.value = 1;
+      this.envGain = context.createGain();
+      this.envGain.gain.value = 0;
+      this.envSource.connect(this.envGain);
+      this.envSource.start();
+    }
+
+    getInputNode(port) {
+      if (port === 'gate') return this.gateIn;
+      return null;
+    }
+
+    getOutputNode(port) {
+      if (port === 'env') return this.envGain;
+      return null;
+    }
+
+    params() {
+      const pick = (id) => this.shadowRoot.getElementById(id).scaledValue;
+      return { a: pick('a'), d: pick('d'), s: pick('s'), r: pick('r') };
+    }
+
+    triggerOn(now) {
+      const { a, d, s } = this.params();
+      const g = this.envGain.gain;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(1, now + a);
+      g.linearRampToValueAtTime(s, now + a + d);
+      this.playhead = 0;
+    }
+
+    triggerOff(now) {
+      const { r } = this.params();
+      const g = this.envGain.gain;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(0, now + r);
+      this.releaseStart = performance.now();
+    }
+
+    monitorGate() {
+      if (this.gateProbe && this.envGain) {
+        const data = new Uint8Array(this.gateProbe.frequencyBinCount);
+        this.gateProbe.getByteTimeDomainData(data);
+        const hi = data.some((v) => Math.abs(v - 128) > 8);
+        const now = this.envGain.context.currentTime;
+        if (hi && !this.lastGate) this.triggerOn(now);
+        if (!hi && this.lastGate) this.triggerOff(now);
+        this.lastGate = hi;
+        this.shadowRoot.getElementById('gate-led').style.background = hi ? 'rgba(229,169,42,1)' : 'rgba(229,169,42,.25)';
+      }
+      requestAnimationFrame(() => this.monitorGate());
+    }
+
+    drawCurve() {
+      const canvas = this.shadowRoot.getElementById('adsr');
+      const ctx = canvas.getContext('2d');
+      const { a, d, s, r } = this.params();
+      const sum = a + d + r + 0.2;
+      const ax = (a / sum) * canvas.width;
+      const dx = ((a + d) / sum) * canvas.width;
+      const rx = ((a + d + 0.2) / sum) * canvas.width;
+      ctx.fillStyle = '#272727';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#7bc1ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height - 4);
+      ctx.lineTo(ax, 8);
+      ctx.lineTo(dx, canvas.height - (s * (canvas.height - 12)) - 4);
+      ctx.lineTo(rx, canvas.height - (s * (canvas.height - 12)) - 4);
+      ctx.lineTo(canvas.width - 4, canvas.height - 4);
+      ctx.stroke();
+      if (this.lastGate) this.playhead = (this.playhead + 1.7) % canvas.width;
+      else if (this.releaseStart > 0 && performance.now() - this.releaseStart < RELEASE_PLAYHEAD_DURATION_MS) this.playhead = (this.playhead + 0.8) % canvas.width;
+      ctx.strokeStyle = 'rgba(229,169,42,0.85)';
+      ctx.beginPath();
+      ctx.moveTo(this.playhead, 2);
+      ctx.lineTo(this.playhead, canvas.height - 2);
+      ctx.stroke();
+      requestAnimationFrame(() => this.drawCurve());
+    }
+  }
+
+  if (!customElements.get('g2-env-adsr')) customElements.define('g2-env-adsr', G2EnvADSR);
+</script>

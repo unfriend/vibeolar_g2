@@ -1,0 +1,126 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      width: 210px;
+      padding: 10px;
+      border: 1px solid #151515;
+      background: linear-gradient(#676767, #4f4f4f);
+      border-radius: 6px;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.35);
+    }
+    .head { font-size: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    canvas { width: 100%; height: 58px; background: #272727; border: 1px solid #131313; border-radius: 4px; }
+    select { background:#2a2a2a; color:#efefef; border:1px solid #111; padding:2px; }
+  </style>
+  <div class="head"><strong>OscDual</strong><span>Osc</span></div>
+  <div class="row">
+    <g2-input color="blue" port="pitch" title="Pitch CV"></g2-input>
+    <select id="waveform">
+      <option value="sine">Sine</option>
+      <option value="square">Square</option>
+      <option value="sawtooth">Saw</option>
+      <option value="triangle">Triangle</option>
+    </select>
+    <g2-output color="red" port="out" title="Audio out"></g2-output>
+  </div>
+  <canvas id="scope" width="190" height="58"></canvas>
+</template>
+<script type="module">
+  const template = document.createElement('template');
+  template.innerHTML = globalThis.__g2CurrentTemplate;
+  const DEFAULT_FREQUENCY = 220;
+
+  class G2OscDual extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this.shadowRoot.appendChild(template.content.cloneNode(true));
+      this.oscA = null;
+      this.oscB = null;
+      this.gain = null;
+      this.pitchIn = null;
+      this.pitchToDetune = null;
+      this.analyser = null;
+      this.scopeData = null;
+    }
+
+    connectedCallback() {
+      this.shadowRoot.getElementById('waveform').addEventListener('change', (event) => {
+        if (this.oscA) this.oscA.type = event.target.value;
+        if (this.oscB) this.oscB.type = event.target.value;
+      });
+      requestAnimationFrame(() => this.drawScope());
+    }
+
+    bindAudioContext(context) {
+      if (this.oscA) return;
+      this.oscA = context.createOscillator();
+      this.oscB = context.createOscillator();
+      this.oscA.frequency.value = DEFAULT_FREQUENCY;
+      this.oscB.frequency.value = DEFAULT_FREQUENCY;
+      this.oscA.detune.value = -6;
+      this.oscB.detune.value = 6;
+      this.oscA.type = this.shadowRoot.getElementById('waveform').value;
+      this.oscB.type = this.shadowRoot.getElementById('waveform').value;
+      this.gain = context.createGain();
+      this.gain.gain.value = 0.22;
+      this.pitchIn = context.createGain();
+      this.pitchToDetune = context.createGain();
+      this.pitchToDetune.gain.value = 100;
+      this.pitchIn.connect(this.pitchToDetune);
+      this.pitchToDetune.connect(this.oscA.detune);
+      this.pitchToDetune.connect(this.oscB.detune);
+      this.oscA.connect(this.gain);
+      this.oscB.connect(this.gain);
+      this.analyser = context.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.scopeData = new Uint8Array(this.analyser.fftSize);
+      this.gain.connect(this.analyser);
+      this.oscA.start();
+      this.oscB.start();
+    }
+
+    getOutputNode(port) {
+      if (port === 'out') return this.gain;
+      return null;
+    }
+
+    getInputNode(port) {
+      if (port === 'pitch') return this.pitchIn;
+      return null;
+    }
+
+    getInputParam(port) {
+      if (port === 'pitch') return this.pitchToDetune.gain;
+      return null;
+    }
+
+    drawScope() {
+      const canvas = this.shadowRoot.getElementById('scope');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#272727';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#61d86d';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (this.analyser && this.scopeData) {
+        this.analyser.getByteTimeDomainData(this.scopeData);
+        for (let i = 0; i < this.scopeData.length; i += 1) {
+          const x = (i / (this.scopeData.length - 1)) * canvas.width;
+          const y = (this.scopeData[i] / 255) * canvas.height;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      } else {
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+      }
+      ctx.stroke();
+      requestAnimationFrame(() => this.drawScope());
+    }
+  }
+
+  if (!customElements.get('g2-osc-dual')) customElements.define('g2-osc-dual', G2OscDual);
+</script>

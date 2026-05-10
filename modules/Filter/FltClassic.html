@@ -1,0 +1,79 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      width: 210px;
+      padding: 10px;
+      border: 1px solid #151515;
+      background: linear-gradient(#676767, #4f4f4f);
+      border-radius: 6px;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.35);
+    }
+    .head { font-size: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .center { display: flex; justify-content: center; }
+  </style>
+  <div class="head"><strong>FltClassic</strong><span>Filter</span></div>
+  <div class="row">
+    <g2-input color="red" port="in" title="Audio in"></g2-input>
+    <g2-input color="blue" port="cutoff" title="Cutoff CV"></g2-input>
+    <g2-output color="red" port="out" title="Audio out"></g2-output>
+  </div>
+  <div class="center">
+    <g2-knob id="cutoff" value="0.65" min="80" max="12000">Cut</g2-knob>
+  </div>
+</template>
+<script type="module">
+  const template = document.createElement('template');
+  template.innerHTML = globalThis.__g2CurrentTemplate;
+
+  class G2FltClassic extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this.shadowRoot.appendChild(template.content.cloneNode(true));
+      this.in = null;
+      this.cutoffIn = null;
+      this.cutoffAmount = null;
+      this.filter = null;
+    }
+
+    connectedCallback() {
+      this.shadowRoot.getElementById('cutoff').addEventListener('g2-change', (event) => {
+        if (this.filter) this.filter.frequency.value = event.detail.value;
+      });
+    }
+
+    bindAudioContext(context) {
+      if (this.filter) return;
+      this.in = context.createGain();
+      this.filter = context.createBiquadFilter();
+      this.filter.type = 'lowpass';
+      this.filter.Q.value = 0.8;
+      this.filter.frequency.value = this.shadowRoot.getElementById('cutoff').scaledValue;
+      this.cutoffIn = context.createGain();
+      this.cutoffAmount = context.createGain();
+      this.cutoffAmount.gain.value = 100;
+      this.cutoffIn.connect(this.cutoffAmount).connect(this.filter.frequency);
+      this.in.connect(this.filter);
+    }
+
+    getInputNode(port) {
+      if (port === 'in') return this.in;
+      if (port === 'cutoff') return this.cutoffIn;
+      return null;
+    }
+
+    getInputParam(port) {
+      if (port === 'cutoff') return this.cutoffAmount.gain;
+      return null;
+    }
+
+    getOutputNode(port) {
+      if (port === 'out') return this.filter;
+      return null;
+    }
+  }
+
+  if (!customElements.get('g2-flt-classic')) customElements.define('g2-flt-classic', G2FltClassic);
+</script>
