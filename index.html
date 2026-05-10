@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vibeolar g2</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #222;
+        --text: #ececec;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      #app {
+        position: relative;
+        display: grid;
+        grid-template-rows: 48px 1fr 6px 1fr;
+        height: 100vh;
+      }
+      #toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        border-bottom: 1px solid #111;
+        background: linear-gradient(#444, #353535);
+      }
+      .patch-area {
+        position: relative;
+        overflow: auto;
+        border-bottom: 1px solid #121212;
+        background: radial-gradient(#3b3b3b 1px, #2d2d2d 1px);
+        background-size: 12px 12px;
+      }
+      #split-bar {
+        background: #191919;
+        cursor: row-resize;
+      }
+      #cable-layer {
+        position: absolute;
+        inset: 48px 0 0 0;
+        width: 100%;
+        height: calc(100% - 48px);
+        pointer-events: none;
+      }
+      .cable {
+        fill: none;
+        stroke-width: 4;
+        opacity: 0.92;
+        stroke-linecap: round;
+        stroke-dasharray: 9 7;
+        animation: flow-fast 0.7s linear infinite;
+        filter: drop-shadow(0 0 calc(var(--flow, 0) * 8px) currentColor);
+      }
+      .cable.blue { animation-duration: 1.1s; }
+      .cable.yellow { animation-duration: 0.35s; }
+      .cable.highlight { stroke-width: 6; opacity: 1; }
+      #drag-cable {
+        fill: none;
+        stroke: #bbb;
+        stroke-width: 3;
+        stroke-dasharray: 6 6;
+      }
+      @keyframes flow-fast {
+        from { stroke-dashoffset: 0; }
+        to { stroke-dashoffset: -32; }
+      }
+      .module-host {
+        position: absolute;
+        pointer-events: auto;
+      }
+      .status {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="toolbar">
+        <strong>vibeolar g2</strong>
+        <span class="status" id="audio-status">AudioContext: standby (click/drag to start)</span>
+      </div>
+      <section id="voice-area" class="patch-area" aria-label="Voice Area"></section>
+      <div id="split-bar" title="Drag to resize"></div>
+      <section id="fx-area" class="patch-area" aria-label="FX Area"></section>
+      <svg id="cable-layer" aria-hidden="true">
+        <path id="drag-cable"></path>
+      </svg>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
